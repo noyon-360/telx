@@ -9,13 +9,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:telx/main.dart';
+import 'package:telx/repositories/authentication_repository.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-
+    final authenticationRepository = AuthenticationRepository();
+    await authenticationRepository.user.first;
     const ThemeMode mockThemeMode = ThemeMode.light;
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp(themeMode: mockThemeMode,));
+    await tester.pumpWidget(MyApp(themeMode: mockThemeMode,authenticationRepository: authenticationRepository,));
 
     // Verify that our counter starts at 0.
     expect(find.text('0'), findsOneWidget);

@@ -1,522 +1,281 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:formz/formz.dart';
 import 'package:telx/bloc/auth/Auth%20Screen/auth_screen_bloc.dart';
-import 'package:telx/bloc/auth/login/login_bloc.dart';
+import 'package:telx/bloc/auth/LoginCubit/login_cubit.dart';
+
+// import 'package:telx/bloc/auth/login/login_bloc.dart';
+// import 'package:telx/bloc/auth/login/login_bloc.dart';
 import 'package:telx/presentation/widgets/google_button.dart';
 import 'package:telx/presentation/widgets/custom_input_field_decorator.dart';
+import 'package:telx/presentation/widgets/logo_section.dart';
 import 'package:telx/utils/device_utils.dart';
-import 'package:telx/presentation/widgets/snack_bar_helper.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  Widget build(BuildContext context) {
+    final bool isMobile = DeviceUtils.isMobile();
+    final double deviceHeight = MediaQuery.of(context).size.height;
+    final double boxHeight = deviceHeight / 3;
+
+    return BlocListener<LoginCubit, LoginState>(
+      listener: (context, state) {
+        if(state.status.isSuccess) {
+
+        }
+        if (state.status.isFailure) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(state.errorMessage ?? 'Authentication Failure'),
+              ),
+            );
+        }
+      },
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          body: Align(
+            alignment: isMobile ? Alignment.center : Alignment.topCenter,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  double formSize = constraints.maxWidth < 600
+                      ? double.infinity
+                      : 500; // Cache calculated values
+
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (!isMobile) SizedBox(height: boxHeight * 0.1),
+                      const LogoSection(
+                          subtitle: "Welcome, Please enter your details"),
+                      _EmailField(formSize: formSize),
+                      const SizedBox(height: 10),
+                      _PasswordField(
+                        formSize: formSize,
+                      ),
+                      const SizedBox(height: 10),
+                      _ForgotPassword(formSize: formSize),
+                      const SizedBox(height: 15),
+                      _LoginButton(formSize: formSize),
+                      const SizedBox(height: 20),
+                      const _SignUpSection(),
+                      const SizedBox(height: 20),
+                      const _DividerWithText(),
+                      const SizedBox(height: 20),
+                      GoogleButtonWidget(formSize: formSize),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
+// class _LogoSection extends StatelessWidget {
+//   const _LogoSection();
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return const Column(
+//       children: [
+//         Text(
+//           "TelX",
+//           style: TextStyle(fontSize: 70, fontWeight: FontWeight.bold),
+//         ),
+//         Text(
+//           "Welcome, Please enter your details",
+//           style: TextStyle(fontSize: 18),
+//         ),
+//         SizedBox(height: 20),
+//       ],
+//     );
+//   }
+// }
 
-  final FocusNode _focusNodeEmail = FocusNode();
+class _EmailField extends StatelessWidget {
+  final double formSize;
 
-  final FocusNode _focusNodePassword = FocusNode();
-
-  final TextEditingController emailController = TextEditingController();
-
-  final TextEditingController passwordController = TextEditingController();
-
-  void _submit(BuildContext context) {
-    if (_formKey.currentState?.validate() ?? false) {
-      context.read<LoginBloc>().add(LoginSubmitted(
-          email: emailController.text, password: passwordController.text));
-      FocusScope.of(context).unfocus();
-    }
-  }
-
-  @override
-  void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
-    _focusNodeEmail.dispose();
-    _focusNodePassword.dispose();
-    super.dispose();
-  }
+  const _EmailField({required this.formSize});
 
   @override
   Widget build(BuildContext context) {
-    print("Main build");
-    double deviceHeight = MediaQuery.of(context).size.height;
-    double boxHeight = deviceHeight / 3;
-    bool isMobile = DeviceUtils.isMobile();
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        body: Align(
-          alignment: isMobile ? Alignment.center : Alignment.topCenter,
-          child: SingleChildScrollView(
-            child: Form(
-              key: _formKey,
-              child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
-                  child: LayoutBuilder(builder: (context, constraints) {
-                    double formSize;
-                    if (constraints.maxWidth < 600) {
-                      formSize = double.infinity;
-                    } else {
-                      formSize = 500;
-                    }
-                    return Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        if (!isMobile)
-                          SizedBox(
-                            height: boxHeight * 0.1,
-                          ),
+    final displayError = context.select(
+      (LoginCubit cubit) => cubit.state.email.displayError,
+    );
+    print("Email printing");
+    return SizedBox(
+      width: formSize,
+      child: TextFormField(
+        // controller: emailController,
+        keyboardType: TextInputType.emailAddress,
+        decoration: customInputDecoration(
+          labelText: 'Email',
+          hintText: 'Enter your email',
+          context: context,
+        ).copyWith(
+          errorText: displayError != null ? 'invalid email' : null,
+        ),
+        onChanged: (value) {
+          context.read<LoginCubit>().emailChanged(value);
+        },
+      ),
+    );
+  }
+}
 
-                        // Todo: Logo
-                        const Text(
-                          "TelX",
-                          style: TextStyle(
-                              fontSize: 70, fontWeight: FontWeight.bold),
-                        ),
+class _PasswordField extends StatelessWidget {
+  final double formSize;
 
-                        const Text(
-                          "Welcome, Please enter your details",
-                          style: TextStyle(fontSize: 18),
-                        ),
+  const _PasswordField({required this.formSize});
 
-                        const SizedBox(
-                          height: 20,
-                        ),
+  @override
+  Widget build(BuildContext context) {
+    final passwordVisibility =
+        context.select((LoginCubit cubit) => cubit.state.passwordVisibility);
+    final displayError = context.select(
+      (LoginCubit cubit) => cubit.state.password.displayError,
+    );
+    return SizedBox(
+      width: formSize,
+      child: TextFormField(
+        obscureText: !passwordVisibility,
+        decoration: customInputDecoration(
+          labelText: 'Password',
+          hintText: 'Enter your password',
+          suffixIcon: IconButton(
+            icon: Icon(
+              passwordVisibility ? Icons.visibility : Icons.visibility_off,
+            ),
+            onPressed: () => context.read<LoginCubit>().toggleObscureText(),
+          ),
+          context: context,
+        ).copyWith(
+          errorText: displayError?.toString(),
+        ),
+        onChanged: (value) {
+          context.read<LoginCubit>().passwordChanged(value);
+        },
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please enter your password';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+}
 
-                        // Todo: User Email
-                        SizedBox(
-                          width: formSize,
-                          child: TextFormField(
-                            focusNode: _focusNodeEmail,
-                            onFieldSubmitted: (value) {
-                              _submit(context);
-                            },
-                            controller: emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: customInputDecoration(
-                                labelText: 'Email',
-                                hintText: 'Enter you email',
-                                context: context),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              } else if (!RegExp(
-                                      r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                  .hasMatch(value)) {
-                                return 'Please enter a valid email';
-                              }
-                              return null;
-                            },
-                          ),
-                        ),
-                        const SizedBox(
-                          height: 10,
-                        ),
+class _ForgotPassword extends StatelessWidget {
+  final double formSize;
 
-                        // Todo: User Password
-                        BlocBuilder<LoginBloc, LoginState>(
-                          buildWhen: (previous, current) {
-                            // Rebuild only when the password visibility toggles or the state changes
-                            if (current is PasswordVisibilityState &&
-                                previous is PasswordVisibilityState) {
-                              return current.isPasswordVisible !=
-                                  previous.isPasswordVisible;
-                            }
-                            // Ensure a new state triggers a rebuild
-                            return previous != current;
-                          },
-                          builder: (context, state) {
-                            print("Password visibility");
-                            final isPasswordVisible =
-                                state is PasswordVisibilityState
-                                    ? state.isPasswordVisible
-                                    : false;
+  const _ForgotPassword({required this.formSize});
 
-                            return SizedBox(
-                              width: formSize,
-                              child: TextFormField(
-                                focusNode: _focusNodePassword,
-                                onFieldSubmitted: (value) {
-                                  _submit(context);
-                                },
-                                obscureText: !isPasswordVisible,
-                                // controller: passwordController,
-                                decoration: customInputDecoration(
-                                  labelText: "Password",
-                                  hintText: "Enter you password",
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      isPasswordVisible
-                                          ? Icons.visibility
-                                          : Icons.visibility_off,
-                                    ),
-                                    onPressed: () {
-                                      context
-                                          .read<LoginBloc>()
-                                          .add(TogglePasswordVisibility());
-                                    },
-                                  ),
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: formSize,
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: InkWell(
+          onTap: () {},
+          child: const Text(
+            'Forgot password?',
+            style: TextStyle(color: Colors.blue),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-                                  context: context,
-                                ),
-                                // onChanged: ,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter your password';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(
-                          height: 10,
-                        ),
+class _LoginButton extends StatelessWidget {
+  final double formSize;
 
-                        // Todo: Forgot Password
-                        SizedBox(
-                            width: formSize,
-                            child: Align(
-                                alignment: Alignment.centerRight,
-                                child: InkWell(
-                                  onTap: () {},
-                                  child: const Text(
-                                    'Forgot password?',
-                                    style: TextStyle(color: Colors.blue),
-                                  ),
-                                ))),
-                        const SizedBox(
-                          height: 15,
-                        ),
+  const _LoginButton({required this.formSize});
 
-                        // Todo: Login Button
-                        SizedBox(
-                          width: formSize,
-                          height: 50,
-                          child: ElevatedButton(
-                              // style: ButtonStyles.formSubmitButtonStyle,
-                              onPressed: () => _submit(context),
-                              child: const Text(
-                                "Login",
-                                style: TextStyle(color: Colors.white),
-                              )),
-                        ),
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.select(
+            (LoginCubit cubit) => cubit);
 
-                        const SizedBox(
-                          height: 20,
-                        ),
 
-                        // Todo: Check Account
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text("Don't have an account?"),
-                            TextButton(
-                                onPressed: () {
-                                  context
-                                      .read<AuthScreenBloc>()
-                                      .add(SwitchToSignup());
-                                  // Navigator.push(context, MaterialPageRoute(builder: (context) => const SignupScreen()));
-                                },
-                                child: const Text(
-                                  'Sign Up',
-                                )),
-                          ],
-                        ),
+    // final isInProgress = context.select(
+    //   (LoginCubit cubit) => cubit.state.status.isInProgress,
+    // );
 
-                        // Todo: "or" Text with Horizontal Lines
-                        const SizedBox(
-                          width: 200,
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 30),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Divider(
-                                    thickness: 1,
-                                    color: Colors.grey, // Line color
-                                  ),
-                                ),
-                                Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 10),
-                                  child: Text(
-                                    "or",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.grey,
-                                      // "or" text color
-                                      fontWeight: FontWeight
-                                          .w600, // Optional: makes "or" bold
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Divider(
-                                    thickness: 1,
-                                    color: Colors.grey, // Line color
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+    if (cubit.state.status.isInProgress) return const CircularProgressIndicator();
 
-                        // Todo: Google Button
-                        GoogleButtonWidget(formSize: formSize)
-                      ],
-                    );
-                  })),
+    // final isValid = context.select(
+    //   (LoginCubit cubit) => cubit.state.isValid,
+    // );
+    return SizedBox(
+      width: formSize,
+      height: 50,
+      child: ElevatedButton(
+        key: const Key('loginForm_continue_raisedButton'),
+        onPressed: cubit.state.isValid
+            ? () => context.read<LoginCubit>().logInWithCredentials(context)
+            : null,
+        child: const Text(
+          'Login',
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+class _SignUpSection extends StatelessWidget {
+  const _SignUpSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text("Don't have an account?"),
+        TextButton(
+          onPressed: () {
+            context.read<AuthScreenBloc>().add(SwitchToSignup());
+          },
+          child: const Text('Sign Up'),
+        ),
+      ],
+    );
+  }
+}
+
+class _DividerWithText extends StatelessWidget {
+  const _DividerWithText();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 200,
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: Colors.grey)),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              "or",
+              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
             ),
           ),
-          // BlocConsumer<LoginBloc, LoginState>(
-          //   listener: (context, state) {
-          //     if (state is LoginSuccess) {
-          //       showCustomSnackBar(
-          //           context: context,
-          //           message: 'Login Successful!',
-          //           type: SnackBarType.success);
-          //     } else if (state is LoginLoading) {
-          //       showCustomSnackBar(
-          //           context: context,
-          //           message: 'Is loading...',
-          //           type: SnackBarType.loading);
-          //     } else if (state is LoginFailure) {
-          //       showCustomSnackBar(
-          //           context: context,
-          //           message: state.error,
-          //           type: SnackBarType.failure);
-          //     }
-          //   },
-          //   builder: (context, state) {
-          //     bool isPasswordVisible = state is PasswordVisibilityState
-          //         ? state.isPasswordVisible
-          //         : false;
-          //
-          //     print("BlocBuilder build");
-          //     if (state is LoginLoading) {
-          //       return const Center(
-          //         child: CircularProgressIndicator(
-          //           color: Colors.grey,
-          //         ),
-          //       );
-          //     } else if (state is PasswordVisibilityState) {
-          //       isPasswordVisible = state.isPasswordVisible;
-          //     }
-          //     return SingleChildScrollView(
-          //       child: Form(
-          //         key: _formKey,
-          //         child: Padding(
-          //             padding: const EdgeInsets.symmetric(
-          //                 horizontal: 8, vertical: 16),
-          //             child: LayoutBuilder(builder: (context, constraints) {
-          //               double formSize;
-          //               if (constraints.maxWidth < 600) {
-          //                 formSize = double.infinity;
-          //               } else {
-          //                 formSize = 500;
-          //               }
-          //               return Column(
-          //                 mainAxisAlignment: MainAxisAlignment.center,
-          //                 crossAxisAlignment: CrossAxisAlignment.center,
-          //                 children: [
-          //                   if (!isMobile)
-          //                     SizedBox(
-          //                       height: boxHeight * 0.1,
-          //                     ),
-          //
-          //                   // Todo: Logo
-          //                   const Text(
-          //                     "TelX",
-          //                     style: TextStyle(
-          //                         fontSize: 70, fontWeight: FontWeight.bold),
-          //                   ),
-          //
-          //                   const Text(
-          //                     "Welcome, Please enter your details",
-          //                     style: TextStyle(fontSize: 18),
-          //                   ),
-          //
-          //                   const SizedBox(
-          //                     height: 20,
-          //                   ),
-          //
-          //                   // Todo: User Email
-          //                   SizedBox(
-          //                     width: formSize,
-          //                     child: TextFormField(
-          //                       focusNode: _focusNodeEmail,
-          //                       onFieldSubmitted: (value) {
-          //                         _submit(context);
-          //                       },
-          //                       controller: emailController,
-          //                       keyboardType: TextInputType.emailAddress,
-          //                       decoration: customInputDecoration(
-          //                           labelText: 'Email',
-          //                           hintText: 'Enter you email',
-          //                           context: context),
-          //                       validator: (value) {
-          //                         if (value == null || value.isEmpty) {
-          //                           return 'Please enter your email';
-          //                         } else if (!RegExp(
-          //                                 r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$')
-          //                             .hasMatch(value)) {
-          //                           return 'Please enter a valid email';
-          //                         }
-          //                         return null;
-          //                       },
-          //                     ),
-          //                   ),
-          //                   const SizedBox(
-          //                     height: 10,
-          //                   ),
-          //
-          //                   // Todo: User Password
-          //                   SizedBox(
-          //                     width: formSize,
-          //                     child: TextFormField(
-          //                       focusNode: _focusNodePassword,
-          //                       onFieldSubmitted: (value) {
-          //                         _submit(context);
-          //                       },
-          //                       obscureText: !isPasswordVisible,
-          //                       controller: passwordController,
-          //                       decoration: customInputDecoration(
-          //                         labelText: "Password",
-          //                         hintText: "Enter you password",
-          //                         suffixIcon: IconButton(
-          //                           icon: Icon(
-          //                             isPasswordVisible
-          //                                 ? Icons.visibility
-          //                                 : Icons.visibility_off,
-          //                           ),
-          //                           onPressed: () {
-          //                             context
-          //                                 .read<LoginBloc>()
-          //                                 .add(TogglePasswordVisibility());
-          //                           },
-          //                         ),
-          //                         context: context,
-          //                       ),
-          //                       validator: (value) {
-          //                         if (value == null || value.isEmpty) {
-          //                           return 'Please enter your password';
-          //                         }
-          //                         return null;
-          //                       },
-          //                     ),
-          //                   ),
-          //                   const SizedBox(
-          //                     height: 10,
-          //                   ),
-          //
-          //                   // Todo: Forgot Password
-          //                   SizedBox(
-          //                       width: formSize,
-          //                       child: Align(
-          //                           alignment: Alignment.centerRight,
-          //                           child: InkWell(
-          //                             onTap: () {},
-          //                             child: const Text(
-          //                               'Forgot password?',
-          //                               style: TextStyle(color: Colors.blue),
-          //                             ),
-          //                           ))),
-          //                   const SizedBox(
-          //                     height: 15,
-          //                   ),
-          //
-          //                   // Todo: Login Button
-          //                   SizedBox(
-          //                     width: formSize,
-          //                     height: 50,
-          //                     child: ElevatedButton(
-          //                         // style: ButtonStyles.formSubmitButtonStyle,
-          //                         onPressed: () => _submit(context),
-          //                         child: const Text(
-          //                           "Login",
-          //                           style: TextStyle(color: Colors.white),
-          //                         )),
-          //                   ),
-          //
-          //                   const SizedBox(
-          //                     height: 20,
-          //                   ),
-          //
-          //                   // Todo: Check Account
-          //                   Row(
-          //                     mainAxisAlignment: MainAxisAlignment.center,
-          //                     children: [
-          //                       const Text("Don't have an account?"),
-          //                       TextButton(
-          //                           onPressed: () {
-          //                             context
-          //                                 .read<AuthScreenBloc>()
-          //                                 .add(SwitchToSignup());
-          //                             // Navigator.push(context, MaterialPageRoute(builder: (context) => const SignupScreen()));
-          //                           },
-          //                           child: const Text(
-          //                             'Sign Up',
-          //                           )),
-          //                     ],
-          //                   ),
-          //
-          //                   // Todo: "or" Text with Horizontal Lines
-          //                   const SizedBox(
-          //                     width: 200,
-          //                     child: Padding(
-          //                       padding: EdgeInsets.symmetric(vertical: 30),
-          //                       child: Row(
-          //                         children: [
-          //                           Expanded(
-          //                             child: Divider(
-          //                               thickness: 1,
-          //                               color: Colors.grey, // Line color
-          //                             ),
-          //                           ),
-          //                           Padding(
-          //                             padding:
-          //                                 EdgeInsets.symmetric(horizontal: 10),
-          //                             child: Text(
-          //                               "or",
-          //                               style: TextStyle(
-          //                                 fontSize: 16,
-          //                                 color: Colors.grey,
-          //                                 // "or" text color
-          //                                 fontWeight: FontWeight
-          //                                     .w600, // Optional: makes "or" bold
-          //                               ),
-          //                             ),
-          //                           ),
-          //                           Expanded(
-          //                             child: Divider(
-          //                               thickness: 1,
-          //                               color: Colors.grey, // Line color
-          //                             ),
-          //                           ),
-          //                         ],
-          //                       ),
-          //                     ),
-          //                   ),
-          //
-          //                   // Todo: Google Button
-          //                   GoogleButtonWidget(formSize: formSize)
-          //                 ],
-          //               );
-          //             })),
-          //       ),
-          //     );
-          //   },
-          // ),
-        ),
+          Expanded(child: Divider(color: Colors.grey)),
+        ],
       ),
     );
   }

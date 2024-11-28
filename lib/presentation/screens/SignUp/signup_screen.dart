@@ -1,323 +1,385 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:formz/formz.dart';
+import 'package:telx/bloc/Sign%20Up%20Process/SignupCubit/signup_cubit.dart';
 import 'package:telx/bloc/Sign%20Up%20Process/signup/signup_bloc.dart';
 import 'package:telx/bloc/auth/Auth%20Screen/auth_screen_bloc.dart';
+import 'package:telx/bloc/auth/LoginCubit/login_cubit.dart';
+import 'package:telx/config/routes/routes_names.dart';
+import 'package:telx/data/theme/color.dart';
 import 'package:telx/presentation/screens/SignUp/email_verification_Screen.dart';
+import 'package:telx/presentation/screens/SignUp/password_strength.dart';
 import 'package:telx/presentation/widgets/google_button.dart';
 import 'package:telx/presentation/widgets/custom_input_field_decorator.dart';
+import 'package:telx/presentation/widgets/logo_section.dart';
 import 'package:telx/utils/device_utils.dart';
 import 'package:telx/presentation/widgets/snack_bar_helper.dart';
 
 class SignupScreen extends StatelessWidget {
-  final _formKey = GlobalKey<FormState>();
-
-  final FocusNode _focusNodeEmail = FocusNode();
-  final FocusNode _focusNodePassword = FocusNode();
-  final FocusNode _focusNodeConfirmPassword = FocusNode();
-
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController =
-      TextEditingController();
-
-  SignupScreen({super.key});
-
-  void _submit(BuildContext context) {
-    if (_formKey.currentState!.validate()) {
-      context.read<SignupBloc>().add(SignupSubmit(
-          email: emailController.text,
-          password: passwordController.text,
-          confirmPassword: confirmPasswordController.text));
-      FocusScope.of(context).unfocus();
-    }
-  }
+  const SignupScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile = DeviceUtils.isMobile();
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        body: Align(
-          alignment: isMobile ? Alignment.center : Alignment.topCenter,
-          child:
-              BlocConsumer<SignupBloc, SignupState>(builder: (context, state) {
-            bool isPasswordVisible = false;
-            bool isConfirmPasswordVisible = false;
-            print("Building");
+    final bool isMobile = DeviceUtils.isMobile();
+    final double deviceHeight = MediaQuery.of(context).size.height;
+    final double boxHeight = deviceHeight / 3;
 
-            if (state is SignupLoading) {
-              return const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.grey,
-                ),
-              );
-            }
-            if (state is PasswordVisibilityState) {
-              print("PasswordVisibilityState");
-              isPasswordVisible = state.isPasswordVisible;
-            }
+    return BlocListener<SignUpCubit, SignUpState>(
+      listener: (context, state) {
+        if (state.status.isSuccess) {
+          // Navigator.of(context).pop();
+          print("go next page");
+          Navigator.pushNamed(context, RoutesNames.verifyCodeScreen);
+        } else if (state.status.isFailure) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(content: Text(state.errorMessage ?? 'Sign Up Failure')),
+            );
+        }
+      },
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          body: Align(
+            alignment: isMobile ? Alignment.center : Alignment.topCenter,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  double formSize = constraints.maxWidth < 600
+                      ? double.infinity
+                      : 500; // Cache calculated values
 
-            if (state is ConfirmPasswordVisibilityState) {
-              print("ConfirmPasswordVisibilityState");
-              isConfirmPasswordVisible = state.isConfirmPasswordVisible;
-            }
-            return SingleChildScrollView(
-                child: LayoutBuilder(builder: (context, constraints) {
-              double formSize;
-              if (constraints.maxWidth < 600) {
-                formSize = double.infinity;
-              } else {
-                formSize = 500;
-              }
-
-              return _form(context, formSize, isPasswordVisible,
-                  isConfirmPasswordVisible, isMobile);
-            }));
-          }, listener: (context, state) {
-            if (state is SignupSuccess) {
-              showCustomSnackBar(
-                  context: context,
-                  message: 'Login Successful!',
-                  type: SnackBarType.success);
-
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => EmailVerificationScreen(
-                            emailAddress: emailController.text,
-                          )));
-            } else if (state is SignupLoading) {
-              showCustomSnackBar(
-                  context: context,
-                  message: 'Is loading...',
-                  type: SnackBarType.loading);
-            } else if (state is SignupFailure) {
-              showCustomSnackBar(
-                  context: context,
-                  message: state.error,
-                  type: SnackBarType.failure);
-            }
-          }),
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (!isMobile) SizedBox(height: boxHeight * 0.1),
+                      const LogoSection(
+                          subtitle: "Welcome, Please enter your details"),
+                      _EmailField(formSize: formSize),
+                      const SizedBox(height: 10),
+                      _PasswordField(formSize: formSize),
+                      const SizedBox(height: 10),
+                      _ConfirmPasswordField(formSize: formSize),
+                      const SizedBox(height: 15),
+                      _ContinueButton(formSize: formSize),
+                      const SizedBox(height: 20),
+                      const _LoginSection(),
+                      const SizedBox(height: 20),
+                      const _DividerWithText(),
+                      const SizedBox(height: 20),
+                      GoogleButtonWidget(formSize: formSize),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _form(BuildContext context, double formSize, bool isPasswordVisible,
-      bool isConfirmPasswordVisible, bool isMobile) {
-    double deviceHeight = MediaQuery.of(context).size.height;
-    double boxHeight = deviceHeight / 3;
-    return Form(
-      key: _formKey,
-      child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (!isMobile)
-                SizedBox(
-                  height: boxHeight * 0.1,
+class _EmailField extends StatelessWidget {
+  final double formSize;
+
+  const _EmailField({required this.formSize});
+
+  @override
+  Widget build(BuildContext context) {
+    bool isSubmitted =
+        context.select((SignUpCubit cubit) => cubit.state.isSubmitted);
+    final email = context.select((SignUpCubit cubit) => cubit.state.email);
+    final displayError = context.select(
+          (SignUpCubit cubit) => cubit.state.email.displayError,
+    );
+    return SizedBox(
+      width: formSize,
+      child: TextFormField(
+        // key: const Key('signUpForm_emailInput_textField'),
+        keyboardType: TextInputType.emailAddress,
+        decoration: customInputDecoration(
+                labelText: 'Email',
+                hintText: 'Enter you email',
+                context: context)
+            ,
+        onChanged: (email) => context.read<SignUpCubit>().emailChanged(email),
+      ),
+    );
+  }
+}
+
+class _PasswordField extends StatelessWidget {
+  final double formSize;
+
+  const _PasswordField({required this.formSize});
+
+  @override
+  Widget build(BuildContext context) {
+    final isPasswordVisible =
+        context.select((SignUpCubit cubit) => cubit.state.passwordVisibility);
+    final isSubmitted =
+        context.select((SignUpCubit cubit) => cubit.state.isSubmitted);
+    final password =
+        context.select((SignUpCubit cubit) => cubit.state.password);
+    return SizedBox(
+      width: formSize,
+      child: Column(
+        children: [
+          TextFormField(
+            // key: const Key('signUpForm_passwordInput_textField'),
+            obscureText: !isPasswordVisible,
+            // controller: passwordController,
+            decoration: customInputDecoration(
+              labelText: "Password",
+              hintText: "Enter you password",
+              suffixIcon: IconButton(
+                icon: Icon(
+                  isPasswordVisible ? Icons.visibility : Icons.visibility_off,
                 ),
-              // Todo: Logo
-              const Text(
-                "TelX",
-                style: TextStyle(fontSize: 70, fontWeight: FontWeight.bold),
+                onPressed: () {
+                  context.read<SignUpCubit>().togglePasswordVisibility();
+                },
               ),
-
-              const Text(
-                "Create your account",
-                style: TextStyle(fontSize: 18),
-              ),
-
-              const SizedBox(
-                height: 20,
-              ),
-
-              // Todo: User Email
-              SizedBox(
-                width: formSize,
-                child: TextFormField(
-                  focusNode: _focusNodeEmail,
-                  onFieldSubmitted: (value) {
-                    _submit(context);
-                  },
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: customInputDecoration(
-                      labelText: 'Email',
-                      hintText: 'Enter you email',
-                      context: context),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
-                    } else if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$')
-                        .hasMatch(value)) {
-                      return 'Please enter a valid email';
-                    }
-                    return null;
-                  },
-                ),
-              ),
-              const SizedBox(
-                height: 10,
-              ),
-
-              // Todo: User Password
-              SizedBox(
-                width: formSize,
-                child: TextFormField(
-                  focusNode: _focusNodePassword,
-                  onFieldSubmitted: (value) {
-                    _submit(context);
-                  },
-                  obscureText: !isPasswordVisible,
-                  controller: passwordController,
-                  decoration: customInputDecoration(
-                    labelText: "Password",
-                    hintText: "Enter you password",
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        isPasswordVisible
-                            ? Icons.visibility
-                            : Icons.visibility_off,
-                      ),
-                      onPressed: () {
-                        context
-                            .read<SignupBloc>()
-                            .add(TogglePasswordVisibility());
-                      },
-                    ),
-                    context: context,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your password';
-                    }
-                    return null;
-                  },
-                ),
-              ),
-              const SizedBox(
-                height: 10,
-              ),
-
-              // Todo: Confirm Password
-              SizedBox(
-                width: formSize,
-                child: TextFormField(
-                  focusNode: _focusNodeConfirmPassword,
-                  onFieldSubmitted: (value) {
-                    _submit(context);
-                  },
-                  obscureText: !isConfirmPasswordVisible,
-                  controller: confirmPasswordController,
-                  decoration: customInputDecoration(
-                    labelText: "Confirm Password",
-                    hintText: "Re-enter you password",
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        isConfirmPasswordVisible
-                            ? Icons.visibility
-                            : Icons.visibility_off,
-                      ),
-                      onPressed: () {
-                        context
-                            .read<SignupBloc>()
-                            .add(ToggleConfirmPasswordVisibility());
-                      },
-                    ),
-                    context: context,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your password';
-                    }
-                    if (value != passwordController.text) {
-                      return 'Password not match';
-                    }
-                    return null;
-                  },
-                ),
-              ),
-
-              const SizedBox(
-                height: 15,
-              ),
-
-              // Todo: Continue Button
-              SizedBox(
-                width: formSize,
-                height: 50,
-                child: ElevatedButton(
-                    // style: ButtonStyles.formSubmitButtonStyle,
-                    onPressed: () => _submit(context),
-                    child: const Text(
-                      "Continue",
-                      style: TextStyle(color: Colors.white),
-                    )),
-              ),
-
-              const SizedBox(
-                height: 20,
-              ),
-
-              // Todo: Check Account
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('Already have an account?'),
-                  TextButton(
-                      onPressed: () {
-                        context.read<AuthScreenBloc>().add(SwitchToLogin());
-                      },
-                      child: const Text(
-                        'Login',
-                      )),
-                ],
-              ),
-
-              // "or" Text with Horizontal Lines
-              const SizedBox(
-                width: 200,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 30),
-                  child: Row(
+              context: context,
+            ),
+            onChanged: (password) =>
+                context.read<SignUpCubit>().passwordChanged(password),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your password';
+              }
+              return null;
+            },
+          ),
+          BlocBuilder<SignUpCubit, SignUpState>(
+            builder: (context, state) {
+              if (state.password.value.isNotEmpty) {
+                if (state.password.value.length < 8) {
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Divider(
-                          thickness: 1,
-                          color: Colors.grey, // Line color
+                      const Text(
+                        'Password must be at least 8 characters',
+                        style: TextStyle(
+                          // color: Colors.red,
+                          fontSize: 14,
                         ),
                       ),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10),
-                        child: Text(
-                          "or",
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey, // "or" text color
-                            fontWeight:
-                                FontWeight.w600, // Optional: makes "or" bold
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Divider(
-                          thickness: 1,
-                          color: Colors.grey, // Line color
-                        ),
-                      ),
+                      InkWell(
+                          onTap: () {
+                            showPasswordStrengthRules(context);
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: Icon(Icons.info_outline),
+                          ))
                     ],
-                  ),
-                ),
-              ),
+                  );
+                } else {
+                  return Row(
+                    children: [
+                      const SizedBox(
+                        height: 5,
+                      ),
+                      Expanded(
+                        child: buildStrengthIndicator(state.passwordStrength),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        mapStrengthToText(state.passwordStrength),
+                        style: TextStyle(
+                          color: mapStrengthToColor(state.passwordStrength),
+                          fontSize: 16,
+                        ),
+                      ),
+                      if (state.passwordStrength.index < 3)
+                        InkWell(
+                            onTap: () {
+                              showPasswordStrengthRules(context);
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(Icons.info_outline),
+                            ))
+                    ],
+                  );
+                }
+              } else {
+                return const SizedBox.shrink();
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-              // Todo: Google Button
-              GoogleButtonWidget(formSize: formSize)
-            ],
+class _ConfirmPasswordField extends StatelessWidget {
+  final double formSize;
+
+  const _ConfirmPasswordField({required this.formSize});
+
+  @override
+  Widget build(BuildContext context) {
+    final isConfirmPasswordVisibility = context
+        .select((SignUpCubit cubit) => cubit.state.confirmPasswordVisibility);
+    final isSubmitted =
+        context.select((SignUpCubit cubit) => cubit.state.isSubmitted);
+    final password = context.select(
+        (SignUpCubit cubit) => cubit.state.confirmedPassword.displayError);
+    return SizedBox(
+      width: formSize,
+      child: Column(
+        children: [
+          TextFormField(
+            // key: const Key('signUpForm_confirmedPasswordInput_textField'),
+            // focusNode: _focusNodeConfirmPassword,
+            // onFieldSubmitted: (value) {
+            //   _submit(context);
+            // },
+            obscureText: !isConfirmPasswordVisibility,
+            // controller: confirmPasswordController,
+            decoration: customInputDecoration(
+              labelText: "Confirm Password",
+              hintText: "Re-enter you password",
+              suffixIcon: IconButton(
+                icon: Icon(
+                  isConfirmPasswordVisibility
+                      ? Icons.visibility
+                      : Icons.visibility_off,
+                ),
+                onPressed: () {
+                  context.read<SignUpCubit>().toggleConfirmPasswordVisibility();
+                },
+              ),
+              context: context,
+            ),
+            onChanged: (confirmPassword) => context.read<SignUpCubit>().confirmedPasswordChanged(confirmPassword),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your password';
+              }
+              // if (value != passwordController.text) {
+              //   return 'Password not match';
+              // }
+              return null;
+            },
+          ),
+          // Feedback Message
+          BlocBuilder<SignUpCubit, SignUpState>(builder: (context, state) {
+            return (state.confirmedPassword.value.isNotEmpty)
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      state.matchMessage!,
+                      style: TextStyle(
+                        color: state.matchPasswords
+                            ? AppColors.success
+                            : state.matchMessage == 'Matching so far...'
+                                ? AppColors.warning
+                                : AppColors.error,
+                        fontSize: 14,
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink();
+          })
+          // if (state.confirmedPassword.value.isNotEmpty)
+        ],
+      ),
+    );
+  }
+}
+
+class _ContinueButton extends StatelessWidget {
+  final double formSize;
+
+  const _ContinueButton({required this.formSize});
+
+  @override
+  Widget build(BuildContext context) {
+    final isInProgress = context.select(
+      (SignUpCubit cubit) => cubit.state.status.isInProgress,
+    );
+
+    if (isInProgress) return const CircularProgressIndicator();
+    //
+    final isValid = context.select(
+      (SignUpCubit cubit) => cubit.state.isValid,
+    );
+
+    final isValidState = context.select(
+      (SignUpCubit cubit) => cubit.state,
+    );
+    return SizedBox(
+      width: formSize,
+      height: 50,
+      child: ElevatedButton(
+          // key: const Key('signUpForm_continue_raisedButton'),
+          // style: ButtonStyles.formSubmitButtonStyle,
+          // onPressed: () => _submit(context),
+          onPressed: () {
+            print("isValid : $isValid");
+            print("Valid State: $isValidState");
+              context.read<SignUpCubit>().continueToCreateAccount();
+            // if (isValid) {
+            // } else {
+            //   print(isValid);
+            // }
+          },
+          child: const Text(
+            "Continue",
+            style: TextStyle(color: Colors.white),
           )),
+    );
+  }
+}
+
+class _LoginSection extends StatelessWidget {
+  const _LoginSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text('Already have an account?'),
+        TextButton(
+            onPressed: () {
+              context.read<AuthScreenBloc>().add(SwitchToLogin());
+            },
+            child: const Text(
+              'Login',
+            )),
+      ],
+    );
+  }
+}
+
+class _DividerWithText extends StatelessWidget {
+  const _DividerWithText();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 200,
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: Colors.grey)),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              "or",
+              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+            ),
+          ),
+          Expanded(child: Divider(color: Colors.grey)),
+        ],
+      ),
     );
   }
 }

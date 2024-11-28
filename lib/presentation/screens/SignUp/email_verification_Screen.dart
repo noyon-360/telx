@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lottie/lottie.dart';
 import 'package:telx/bloc/Sign%20Up%20Process/email_verification/email_verification_bloc.dart';
+import 'package:telx/config/routes/routes_names.dart';
 import 'package:telx/presentation/screens/SignUp/user_form_screen.dart';
+import 'package:telx/repositories/authentication_repository.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String emailAddress;
@@ -55,7 +58,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         });
       } else {
         timer.cancel();
-        print("Timer Complete");
+        if (kDebugMode) {
+          print("Timer Complete");
+        }
       }
     });
   }
@@ -78,8 +83,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       child: BlocConsumer<EmailVerificationBloc, EmailVerificationState>(
         listener: (context, state) {
           if (state is EmailVerificationSuccess) {
-            Navigator.push(context,
-                MaterialPageRoute(builder: (context) => UserFormScreen()));
+            Navigator.pushNamed(context, RoutesNames.userInfoDetailsScreen);
+            // Navigator.push(context,
+            //     MaterialPageRoute(builder: (context) => const UserFormScreen()));
           } else if (state is EmailVerificationFailure) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.error)),
@@ -207,8 +213,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                                   )
                                 : TextButton(
                                     onPressed: () {
-                                      bloc.add(SendCode(
-                                          userEmail: widget.emailAddress));
+                                      // bloc.add(SendCode(
+                                      //     userEmail: widget.emailAddress));
                                       _startTimer();
                                     },
                                     child: const Text(
@@ -223,7 +229,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                               child: ElevatedButton(
                                 onPressed: () {
                                   if (codeDigits.isNotEmpty) {
-                                    bloc.add(CodeSubmitted());
+                                    // bloc.add(CodeSubmitted());
                                   }
                                 },
                                 // style: ButtonStyles.formSubmitButtonStyle,

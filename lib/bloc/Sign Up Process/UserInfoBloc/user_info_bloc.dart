@@ -1,5 +1,7 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:telx/bloc/Sign%20Up%20Process/email_verification/email_verification_bloc.dart';
 
 part 'user_info_event.dart';
 
@@ -20,7 +22,7 @@ class UserInfoBloc extends Bloc<UserInfoEvent, UserInfoState> {
     // });
 
     on<ConfirmAccount>((event, emit) {
-      // emit(const Confirmed());
+      // emit( Confirmed);
       print(event.birthday);
       print(event.gender);
       emit(Confirmed(

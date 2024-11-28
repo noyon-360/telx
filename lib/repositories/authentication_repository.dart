@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:meta/meta.dart';
@@ -209,6 +211,86 @@ class AuthenticationRepository {
     }
   }
 
+  Future<bool> checkEmailExistence(String email) async {
+    print("User Email : $email");
+    try {
+      await _firebaseAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: 'temporaryPassword', // Use a temporary password
+      );
+      // If successful, delete the user
+      await _firebaseAuth.currentUser?.delete();
+      return false; // Email does not exist
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        return true; // Email exists
+      }
+      throw Exception('Error checking email existence: ${e.message}');
+    }
+  }
+
+  Future<void> sendCodeOnEmail(String email) async {
+    print("Attempting to send verification code to: $email");
+    try {
+      final response = await http.post(
+        Uri.parse("http://192.168.0.218:4000/sendVerificationCode"),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'email': email}),
+      );
+
+      switch (response.statusCode) {
+        case 200:
+          print("Code sent successfully.");
+          break;
+        case 400:
+          // Likely email does not exist or missing fields
+          final errorMessage =
+              jsonDecode(response.body)['error'] ?? "Invalid request";
+          print("Client error: $errorMessage");
+          throw Exception(errorMessage);
+        case 401:
+          // Unauthorized or authentication error
+          print("Authentication error. Please check your API credentials.");
+          throw Exception("Authentication failed.");
+        case 429:
+          // Too many requests (rate limit exceeded)
+          print("Too many requests. Please try again later.");
+          throw Exception("Rate limit exceeded. Try again later.");
+        case 500:
+          // Internal server error
+          print("Server encountered an error. Please try again.");
+          throw Exception("Internal server error. Try again later.");
+        default:
+          // Handle unexpected status codes
+          print("Unexpected error: ${response.statusCode}");
+          throw Exception(
+              "Unexpected error occurred. Code: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Error while sending verification code: $e");
+      throw Exception("Failed to send verification code: $e");
+    }
+  }
+
+  Future<bool> verifyCode(String email, String code) async {
+    final response =
+        await http.post(Uri.parse("http://192.168.0.218:4000/verify-code"),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              "email": email,
+              "code": code,
+            }));
+
+    if (response.statusCode == 200) {
+      return true;
+    }
+    return false;
+  }
+
   /// Starts the Sign In with Google Flow.
   ///
   /// Throws a [LogInWithGoogleFailure] if an exception occurs.
@@ -257,6 +339,42 @@ class AuthenticationRepository {
     }
   }
 
+  Future<Map<String, dynamic>> addUserViaApi(User user) async {
+    // Replace this with your actual API call (using http package, dio, etc.)
+    print("Im come into the add user via api");
+    try {
+      final response = await http.post(
+        Uri.parse('http://192.168.0.218:4000/addUser'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'fullName': user.fullName,
+          'username': user.username,
+          'email': user.email,
+          'profilePicture': user.photo,
+          'lastSeen': DateTime.now().toIso8601String(),
+          'status': 'Active',
+          'isOnline': true,
+          'dateOfBirth': user.dateOfBirth?.split('T')[0],
+          'gender': user.gender,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return {'status': 200, 'message': 'User created successfully'};
+      } else {
+        return {
+          'status': response.statusCode,
+          'message': 'Failed to create user'
+        };
+      }
+    } catch (e) {
+      print("Error problem is : $e");
+      return {'status': 500, 'message': 'An error occurred'};
+    }
+  }
+
   /// Signs out the current user which will emit
   /// [User.empty] from the [user] Stream.
   ///
@@ -276,6 +394,6 @@ class AuthenticationRepository {
 extension on firebase_auth.User {
   /// Maps a [firebase_auth.User] into a [User].
   User get toUser {
-    return User(id: uid, email: email, name: displayName, photo: photoURL);
+    return User(id: uid, email: email, fullName: displayName, photo: photoURL);
   }
 }

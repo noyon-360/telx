@@ -11,6 +11,7 @@ class EmailVerificationBloc
     extends Bloc<EmailVerificationEvent, EmailVerificationState> {
   final List<String> _codeDigits = List.generate(6, (_) => '');
 
+
   EmailVerificationBloc() : super(EmailVerificationInitial()) {
     on<CodeChanged>((event, emit) {
       _codeDigits[event.index] = event.value;
@@ -20,6 +21,7 @@ class EmailVerificationBloc
     on<SendCode>((event, emit) async {
       print(event.userEmail);
 
+      // await
       // try {
       //   await EmailVerifyCodeRepository.sendVerificationCode(event.userEmail);
       // } catch (e) {

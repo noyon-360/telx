@@ -10,3 +10,6 @@ abstract class AuthScreenEvent extends Equatable {
 class SwitchToLogin extends AuthScreenEvent {}
 
 class SwitchToSignup extends AuthScreenEvent {}
+
+class CheckAuthentication extends AuthScreenEvent {}
+class LoadingEvent extends AuthScreenEvent {}
