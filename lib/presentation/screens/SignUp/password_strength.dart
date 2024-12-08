@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:telx/bloc/Sign%20Up%20Process/SignupCubit/signup_cubit.dart';
-import 'package:telx/data/theme/color.dart';
+// import 'package:flutter/material.dart';
+// import 'package:telx/bloc/Sign%20Up%20Process/SignupCubit/signup_cubit.dart';
+// import 'package:telx/data/theme/color.dart';
+
+part of "signup_view_link.dart";
 
 String mapStrengthToText (PasswordStrength strength) {
   switch (strength) {

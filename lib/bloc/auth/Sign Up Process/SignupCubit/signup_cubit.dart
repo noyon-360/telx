@@ -1,13 +1,11 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:formz/formz.dart';
-import 'package:meta/meta.dart';
-import 'package:telx/presentation/screens/SignUp/password_strength.dart';
-import 'package:telx/repositories/authentication_repository.dart';
-import 'package:telx/src/email.dart';
-import 'package:telx/src/confirm_password.dart';
 
-import '../../../src/password.dart';
+import 'package:telx/repositories/authentication_repository.dart';
+
+
+import '../../../../presentation/screens/SignUp/signup_view_link.dart';
+
 
 part 'signup_state.dart';
 
@@ -17,38 +15,19 @@ class SignUpCubit extends Cubit<SignUpState> {
   final AuthenticationRepository _authenticationRepository;
 
   void emailChanged(String value) {
-    final email = Email.dirty(value);
-    emit(
-      state.copyWith(
-        email: email,
-        isValid: Formz.validate([
-          email,
-          state.password,
-          state.confirmedPassword,
-        ]),
-      ),
-    );
+    final isEmailValid = _validateEmail(value);
+
+    emit(state.copyWith(email: value, isValid: isEmailValid));
   }
 
   void passwordChanged(String value) {
-    final password = Password.dirty(value);
+    final isPasswordValid = _validatePassword(value);
     final passwordStrength = calculatePasswordStrength(value);
-    final confirmedPassword = ConfirmedPassword.dirty(
-      password: password.value,
-      value: state.confirmedPassword.value,
-    );
-    emit(
-      state.copyWith(
-        password: password,
-        passwordStrength: passwordStrength,
-        confirmedPassword: confirmedPassword,
-        isValid: Formz.validate([
-          state.email,
-          password,
-          confirmedPassword,
-        ]),
-      ),
-    );
+
+    emit(state.copyWith(
+        password: value,
+        isValid: isPasswordValid,
+        passwordStrength: passwordStrength));
   }
 
   void togglePasswordVisibility() {
@@ -56,26 +35,41 @@ class SignUpCubit extends Cubit<SignUpState> {
   }
 
   void confirmedPasswordChanged(String value) {
-    final confirmedPassword = ConfirmedPassword.dirty(
-      password: state.password.value,
-      value: value,
-    );
-    emit(
-      state.copyWith(
-        confirmedPassword: confirmedPassword,
-        isValid: Formz.validate([
-          state.email,
-          state.password,
-          confirmedPassword,
-        ]),
-      ),
-    );
+    // final isConfirmedPasswordValid = _validatePassword(value);
+
+    print("confirm Password => ${state.confirmedPassword}");
+
+    emit(state.copyWith(
+      confirmedPassword: value,
+    ));
     _checkPasswordsMatch();
   }
 
+  // void confirmedPasswordChanged(String value) {
+  //   final confirmedPassword = ConfirmedPassword.dirty(
+  //     password: state.password.value,
+  //     value: value,
+  //   );
+  //   emit(
+  //     state.copyWith(
+  //       confirmedPassword: confirmedPassword,
+  //       isValid: Formz.validate([
+  //         state.email,
+  //         state.password,
+  //         confirmedPassword,
+  //       ]),
+  //     ),
+  //   );
+  //   _checkPasswordsMatch();
+  // }
+
   void _checkPasswordsMatch() {
-    final password = state.password.value;
-    final confirmedPassword = state.confirmedPassword.value;
+    final password = state.password;
+    final confirmedPassword = state.confirmedPassword;
+
+    // print("Password => ${state.password}");
+
+    print("I am matching password $confirmedPassword");
 
     if (confirmedPassword.isEmpty) {
       emit(state.copyWith(matchPasswords: false, matchMessage: null));
@@ -100,29 +94,42 @@ class SignUpCubit extends Cubit<SignUpState> {
   }
 
   Future<void> continueToCreateAccount() async {
+      emit(state.copyWith(status: SignupStatus.inProgress));
     emit(state.copyWith(isSubmitted: true));
     if (!state.isValid) {
       emit(state.copyWith(isSubmitted: false));
       return;
     }
     try {
-      emit(state.copyWith(status: FormzSubmissionStatus.inProgress));
-      bool isEmailExist = await _authenticationRepository
-          .checkEmailExistence(state.email.value);
+      bool isEmailExist =
+          await _authenticationRepository.checkEmailExistence(state.email);
 
       if (!isEmailExist) {
-        await _authenticationRepository.sendCodeOnEmail(state.email.value);
-        emit(state.copyWith(status: FormzSubmissionStatus.success));
+        emit(state.copyWith(emailExist: false));
+        await _authenticationRepository.sendCodeOnEmail(state.email);
+        emit(state.copyWith(status: SignupStatus.success));
+      }
+      else if(isEmailExist){
+        emit(state.copyWith(emailExist: true));
       }
     } catch (e) {
       emit(state.copyWith(
-        status: FormzSubmissionStatus.failure,
+        status: SignupStatus.failure,
         errorMessage: e.toString(),
       ));
       print("Error: $e");
     } finally {
-      emit(state.copyWith(isSubmitted: false));
+      emit(state.copyWith(isSubmitted: false, status: SignupStatus.initial));
     }
+  }
+
+  // Todo : Validation checking
+  bool _validateEmail(String email) {
+    return email.isNotEmpty && email.contains('@');
+  }
+
+  bool _validatePassword(String password) {
+    return password.isNotEmpty && password.length >= 6;
   }
 
 // Future<void> signUpFormSubmitted() async {

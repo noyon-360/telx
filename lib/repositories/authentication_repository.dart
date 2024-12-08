@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:meta/meta.dart';
+import 'package:telx/config/routes/routes_names.dart';
 import 'package:telx/data/cache/cache_client.dart';
 import 'package:telx/src/models/user.dart';
 
@@ -177,22 +181,27 @@ class AuthenticationRepository {
   @visibleForTesting
   static const userCacheKey = '__user_cache_key__';
 
-  /// Stream of [User] which will emit the current user when
+  /// Stream of [UserModel] which will emit the current user when
   /// the authentication state changes.
   ///
-  /// Emits [User.empty] if the user is not authenticated.
-  Stream<User> get user {
-    return _firebaseAuth.authStateChanges().map((firebaseUser) {
-      final user = firebaseUser == null ? User.empty : firebaseUser.toUser;
+  /// Emits [UserModel.empty] if the user is not authenticated.
+  Stream<UserModel> get user {
+    return _firebaseAuth.authStateChanges().asyncMap((firebaseUser) async {
+      if (firebaseUser == null) return UserModel.empty;
+
+      // Convert firebaseUser to your custom User with additional data
+      final user = await firebaseUser.toUser;
+      print("Im in auth repo : $user");
+
       _cache.write(key: userCacheKey, value: user);
       return user;
     });
   }
 
   /// Returns the current cached user.
-  /// Defaults to [User.empty] if there is no cached user.
-  User get currentUser {
-    return _cache.read<User>(key: userCacheKey) ?? User.empty;
+  /// Defaults to [UserModel.empty] if there is no cached user.
+  UserModel get currentUser {
+    return _cache.read<UserModel>(key: userCacheKey) ?? UserModel.empty;
   }
 
   /// Creates a new user with the provided [email] and [password].
@@ -294,9 +303,36 @@ class AuthenticationRepository {
   /// Starts the Sign In with Google Flow.
   ///
   /// Throws a [LogInWithGoogleFailure] if an exception occurs.
-  Future<void> logInWithGoogle() async {
+  // Future<void> logInWithGoogle() async {
+  //   try {
+  //     late final firebase_auth.AuthCredential credential;
+  //     if (isWeb) {
+  //       final googleProvider = firebase_auth.GoogleAuthProvider();
+  //       final userCredential = await _firebaseAuth.signInWithPopup(
+  //         googleProvider,
+  //       );
+  //       credential = userCredential.credential!;
+  //     } else {
+  //       final googleUser = await _googleSignIn.signIn();
+  //       final googleAuth = await googleUser!.authentication;
+  //       credential = firebase_auth.GoogleAuthProvider.credential(
+  //         accessToken: googleAuth.accessToken,
+  //         idToken: googleAuth.idToken,
+  //       );
+  //     }
+  //
+  //     await _firebaseAuth.signInWithCredential(credential);
+  //   } on firebase_auth.FirebaseAuthException catch (e) {
+  //     throw LogInWithGoogleFailure.fromCode(e.code);
+  //   } catch (_) {
+  //     throw const LogInWithGoogleFailure();
+  //   }
+  // }
+
+  Future<void> logInWithGoogle({required BuildContext context}) async {
     try {
       late final firebase_auth.AuthCredential credential;
+
       if (isWeb) {
         final googleProvider = firebase_auth.GoogleAuthProvider();
         final userCredential = await _firebaseAuth.signInWithPopup(
@@ -305,41 +341,187 @@ class AuthenticationRepository {
         credential = userCredential.credential!;
       } else {
         final googleUser = await _googleSignIn.signIn();
-        final googleAuth = await googleUser!.authentication;
+        if (googleUser == null) {
+          // User canceled the sign-in process
+          return;
+        }
+        final googleAuth = await googleUser.authentication;
         credential = firebase_auth.GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
       }
 
-      await _firebaseAuth.signInWithCredential(credential);
+      // Sign in with Google credential
+      final userCredential =
+          await _firebaseAuth.signInWithCredential(credential);
+
+      // Get the current user's UID
+      final String uid = userCredential.user?.uid ?? '';
+
+      if (uid.isEmpty) {
+        throw Exception("User UID not found");
+      }
+
+      // Check if the user exists in the Firestore database
+      final DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+      if (userDoc.exists) {
+        // User exists, navigate to the HomePage
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          RoutesNames.homeScreen,
+          (route) => false,
+        );
+      } else {
+        // User does not exist, navigate to the UserInfoDetailsScreen
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          RoutesNames.userInfoDetailsScreen,
+          (route) => false,
+        );
+      }
     } on firebase_auth.FirebaseAuthException catch (e) {
-      throw LogInWithGoogleFailure.fromCode(e.code);
-    } catch (_) {
-      throw const LogInWithGoogleFailure();
+      // Handle Firebase authentication errors
+      if (e.code == 'account-exists-with-different-credential') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('This account exists with a different sign-in method.'),
+          ),
+        );
+      } else if (e.code == 'invalid-credential') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid Google credential.')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google sign-in failed: ${e.message}')),
+        );
+      }
+    } catch (e) {
+      // Handle other exceptions
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred: ${e.toString()}')),
+      );
     }
   }
 
   /// Signs in with the provided [email] and [password].
   ///
   /// Throws a [LogInWithEmailAndPasswordFailure] if an exception occurs.
+  // Future<void> logInWithEmailAndPassword({
+  //   required String email,
+  //   required String password,
+  // }) async {
+  //   try {
+  //     await _firebaseAuth.signInWithEmailAndPassword(
+  //       email: email,
+  //       password: password,
+  //     );
+  //   } on firebase_auth.FirebaseAuthException catch (e) {
+  //     throw LogInWithEmailAndPasswordFailure.fromCode(e.code);
+  //   } catch (_) {
+  //     throw const LogInWithEmailAndPasswordFailure();
+  //   }
+  // }
+
+
   Future<void> logInWithEmailAndPassword({
     required String email,
     required String password,
+    required BuildContext context,
   }) async {
     try {
+      // Sign in the user
       await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      // Get the current user's UID
+      final String uid = _firebaseAuth.currentUser?.uid ?? '';
+
+      print(_firebaseAuth.currentUser);
+
+      // final credential = await _firebaseAuth.createUserWithEmailAndPassword(
+      //     email: email, password: password);
+      // if (credential.credential != null) {
+      //   _firebaseAuth.currentUser!.delete();
+      //   print("Please sign in first");
+      // } else {
+      //   print("Password is wrong");
+      // }
+
+      if (uid.isEmpty) {
+        throw Exception("User UID not found");
+      }
+
+      // Check if the user exists in the Firestore database
+      final DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+      if (userDoc.exists) {
+        // User exists, navigate to the HomePage
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          RoutesNames.homeScreen,
+          (route) => false,
+        );
+      } else {
+        // User does not exist, log out and navigate back to the LoginScreen
+        // await _firebaseAuth.signOut();
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          RoutesNames.userInfoDetailsScreen,
+          (route) => false,
+        );
+        // showCustomSnackBar(context: context, message: 'message', type: SnackBarType.failure);
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   const SnackBar(content: Text('User does not exist in the database.')),
+        // );
+      }
     } on firebase_auth.FirebaseAuthException catch (e) {
-      throw LogInWithEmailAndPasswordFailure.fromCode(e.code);
-    } catch (_) {
-      throw const LogInWithEmailAndPasswordFailure();
+      print("Im printing e -> ${e.code}");
+      // Handle Firebase authentication errors
+      if (e.code == 'user-not-found') {
+        // Email does not exist
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Email not found. Please register first.')),
+        );
+      } else if (e.code == 'wrong-password') {
+        // Password is incorrect
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Incorrect password. Please try again.')),
+        );
+      } else if (e.code == 'invalid-email') {
+        // Invalid email format
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid email format.')),
+        );
+      }else if (e.code == 'invalid-credential') {
+        // Invalid email format
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid email and password')),
+        );
+      } else {
+        // Other FirebaseAuth errors
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Authentication failed: ${e.message}')),
+        );
+      }
+    } catch (e) {
+      // Handle any other exceptions
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred: ${e.toString()}')),
+      );
     }
   }
 
-  Future<Map<String, dynamic>> addUserViaApi(User user) async {
+  Future<Map<String, dynamic>> addUserViaApi(UserModel user) async {
     // Replace this with your actual API call (using http package, dio, etc.)
     print("Im come into the add user via api");
     try {
@@ -349,6 +531,7 @@ class AuthenticationRepository {
           'Content-Type': 'application/json',
         },
         body: json.encode({
+          'uid': user.id,
           'fullName': user.fullName,
           'username': user.username,
           'email': user.email,
@@ -376,7 +559,7 @@ class AuthenticationRepository {
   }
 
   /// Signs out the current user which will emit
-  /// [User.empty] from the [user] Stream.
+  /// [UserModel.empty] from the [user] Stream.
   ///
   /// Throws a [LogOutFailure] if an exception occurs.
   Future<void> logOut() async {
@@ -391,9 +574,37 @@ class AuthenticationRepository {
   }
 }
 
-extension on firebase_auth.User {
-  /// Maps a [firebase_auth.User] into a [User].
-  User get toUser {
-    return User(id: uid, email: email, fullName: displayName, photo: photoURL);
+extension FirebaseUserToUser on firebase_auth.User {
+  /// Maps a [firebase_auth.User] into a [UserModel], fetching additional fields from Firestore.
+  Future<UserModel> get toUser async {
+    // Base User data from Firebase Authentication
+    final baseUser = UserModel(
+      id: uid,
+      email: email,
+      fullName: displayName,
+      photo: photoURL,
+    );
+
+    try {
+      // Fetch additional fields from Firestore
+      final doc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (doc.exists) {
+        final data = doc.data();
+        return UserModel(
+          id: baseUser.id,
+          email: baseUser.email,
+          fullName: data?['fullName'] as String?,
+          photo: data?['profilePicture'] as String?,
+          username: data?['username'] as String?,
+          dateOfBirth: data?['dateOfBirth'] as String?,
+          gender: data?['gender'] as String?,
+        );
+      }
+    } catch (e) {
+      print("Error fetching user additional data: $e");
+    }
+    // Return base User if no additional data is found or an error occurs
+    return baseUser;
   }
 }

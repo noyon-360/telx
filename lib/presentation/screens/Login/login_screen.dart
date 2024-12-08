@@ -1,16 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:formz/formz.dart';
-import 'package:telx/bloc/auth/Auth%20Screen/auth_screen_bloc.dart';
-import 'package:telx/bloc/auth/LoginCubit/login_cubit.dart';
-
-// import 'package:telx/bloc/auth/login/login_bloc.dart';
-// import 'package:telx/bloc/auth/login/login_bloc.dart';
-import 'package:telx/presentation/widgets/google_button.dart';
-import 'package:telx/presentation/widgets/custom_input_field_decorator.dart';
-import 'package:telx/presentation/widgets/logo_section.dart';
-import 'package:telx/utils/device_utils.dart';
+part of 'login_view_link.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -21,131 +9,117 @@ class LoginScreen extends StatelessWidget {
     final double deviceHeight = MediaQuery.of(context).size.height;
     final double boxHeight = deviceHeight / 3;
 
-    return BlocListener<LoginCubit, LoginState>(
-      listener: (context, state) {
-        if(state.status.isSuccess) {
+    // final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-        }
-        if (state.status.isFailure) {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(
-                content: Text(state.errorMessage ?? 'Authentication Failure'),
-              ),
-            );
-        }
-      },
-      child: GestureDetector(
+    return GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
-        child: Scaffold(
-          body: Align(
-            alignment: isMobile ? Alignment.center : Alignment.topCenter,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  double formSize = constraints.maxWidth < 600
-                      ? double.infinity
-                      : 500; // Cache calculated values
-
-                  return Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (!isMobile) SizedBox(height: boxHeight * 0.1),
-                      const LogoSection(
-                          subtitle: "Welcome, Please enter your details"),
-                      _EmailField(formSize: formSize),
-                      const SizedBox(height: 10),
-                      _PasswordField(
-                        formSize: formSize,
-                      ),
-                      const SizedBox(height: 10),
-                      _ForgotPassword(formSize: formSize),
-                      const SizedBox(height: 15),
-                      _LoginButton(formSize: formSize),
-                      const SizedBox(height: 20),
-                      const _SignUpSection(),
-                      const SizedBox(height: 20),
-                      const _DividerWithText(),
-                      const SizedBox(height: 20),
-                      GoogleButtonWidget(formSize: formSize),
-                    ],
-                  );
-                },
+        child: Stack(
+          children: [
+            BlocListener<LoginCubit, LoginState>(
+              listener: (context, state) {
+                if (state.status == LoginStatus.inProgress) {
+                  context.read<LoadingCubit>().startLoading();
+                } else {
+                  context.read<LoadingCubit>().stopLoading();
+                }
+              },
+              child: Scaffold(
+                body: Align(
+                  alignment: isMobile ? Alignment.center : Alignment.topCenter,
+                  child: SingleChildScrollView(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        double formSize =
+                            constraints.maxWidth < 600 ? double.infinity : 500;
+                        return SizedBox(
+                          width: formSize,
+                          child: Form(
+                            // key: _formKey,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (!isMobile)
+                                  SizedBox(height: boxHeight * 0.1),
+                                const LogoSection(subtitle: "Welcome, Please enter your details"),
+                                EmailField(formSize: formSize),
+                                const SizedBox(height: 10),
+                                PasswordField(formSize: formSize),
+                                const SizedBox(height: 10),
+                                ForgotPassword(formSize: formSize),
+                                const SizedBox(height: 15),
+                                _LoginButton(formSize: formSize),
+                                const SizedBox(height: 20),
+                                const _SignUpSection(),
+                                const SizedBox(height: 20),
+                                const _DividerWithText(),
+                                const SizedBox(height: 20),
+                                GoogleButtonWidget(formSize: formSize),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      ),
-    );
+            BlocBuilder<LoadingCubit, bool>(
+                buildWhen: (previous, current) => previous != current,
+                builder: (context, isLoading) {
+                  return isLoading
+                      ? const LoadingPage()
+                      : const SizedBox.shrink(); // Show or hide based on state
+                })
+          ],
+        ));
   }
 }
 
-// class _LogoSection extends StatelessWidget {
-//   const _LogoSection();
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return const Column(
-//       children: [
-//         Text(
-//           "TelX",
-//           style: TextStyle(fontSize: 70, fontWeight: FontWeight.bold),
-//         ),
-//         Text(
-//           "Welcome, Please enter your details",
-//           style: TextStyle(fontSize: 18),
-//         ),
-//         SizedBox(height: 20),
-//       ],
-//     );
-//   }
-// }
-
-class _EmailField extends StatelessWidget {
+class EmailField extends StatelessWidget {
   final double formSize;
 
-  const _EmailField({required this.formSize});
+  const EmailField({super.key, required this.formSize});
 
   @override
   Widget build(BuildContext context) {
-    final displayError = context.select(
-      (LoginCubit cubit) => cubit.state.email.displayError,
-    );
-    print("Email printing");
     return SizedBox(
       width: formSize,
       child: TextFormField(
-        // controller: emailController,
         keyboardType: TextInputType.emailAddress,
         decoration: customInputDecoration(
           labelText: 'Email',
           hintText: 'Enter your email',
           context: context,
-        ).copyWith(
-          errorText: displayError != null ? 'invalid email' : null,
         ),
         onChanged: (value) {
           context.read<LoginCubit>().emailChanged(value);
+        },
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please enter your email';
+          }
+          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+            return 'Please enter a valid email address';
+          }
+          return null;
         },
       ),
     );
   }
 }
 
-class _PasswordField extends StatelessWidget {
+class PasswordField extends StatelessWidget {
   final double formSize;
 
-  const _PasswordField({required this.formSize});
+  const PasswordField({super.key, required this.formSize});
 
   @override
   Widget build(BuildContext context) {
     final passwordVisibility =
         context.select((LoginCubit cubit) => cubit.state.passwordVisibility);
-    final displayError = context.select(
-      (LoginCubit cubit) => cubit.state.password.displayError,
-    );
     return SizedBox(
       width: formSize,
       child: TextFormField(
@@ -160,8 +134,6 @@ class _PasswordField extends StatelessWidget {
             onPressed: () => context.read<LoginCubit>().toggleObscureText(),
           ),
           context: context,
-        ).copyWith(
-          errorText: displayError?.toString(),
         ),
         onChanged: (value) {
           context.read<LoginCubit>().passwordChanged(value);
@@ -170,6 +142,9 @@ class _PasswordField extends StatelessWidget {
           if (value == null || value.isEmpty) {
             return 'Please enter your password';
           }
+          if (value.length < 6) {
+            return 'Password must be at least 6 characters long';
+          }
           return null;
         },
       ),
@@ -177,10 +152,10 @@ class _PasswordField extends StatelessWidget {
   }
 }
 
-class _ForgotPassword extends StatelessWidget {
+class ForgotPassword extends StatelessWidget {
   final double formSize;
 
-  const _ForgotPassword({required this.formSize});
+  const ForgotPassword({super.key, required this.formSize});
 
   @override
   Widget build(BuildContext context) {
@@ -207,16 +182,16 @@ class _LoginButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cubit = context.select(
-            (LoginCubit cubit) => cubit);
-
+    // final cubit = context.select((LoginCubit cubit) => cubit);
 
     // final isInProgress = context.select(
     //   (LoginCubit cubit) => cubit.state.status.isInProgress,
     // );
 
-    if (cubit.state.status.isInProgress) return const CircularProgressIndicator();
-
+    // if (cubit.state.status.isInProgress) {
+    //   return const CircularProgressIndicator();
+    // }
+    final cubit = context.read<LoginCubit>();
     // final isValid = context.select(
     //   (LoginCubit cubit) => cubit.state.isValid,
     // );
@@ -224,10 +199,16 @@ class _LoginButton extends StatelessWidget {
       width: formSize,
       height: 50,
       child: ElevatedButton(
-        key: const Key('loginForm_continue_raisedButton'),
-        onPressed: cubit.state.isValid
-            ? () => context.read<LoginCubit>().logInWithCredentials(context)
-            : null,
+        // key: const Key('loginForm_continue_raisedButton'),
+        onPressed: () {
+          cubit.logInWithCredentials(context);
+        },
+        // cubit.state.isValid
+        //     ? () => context.read<LoginCubit>().logInWithCredentials(context)
+        //     : () => showCustomSnackBar(
+        //         context: context,
+        //         message: 'Field is not valid',
+        //         type: SnackBarType.failure),
         child: const Text(
           'Login',
           style: TextStyle(color: Colors.white),
@@ -248,7 +229,12 @@ class _SignUpSection extends StatelessWidget {
         const Text("Don't have an account?"),
         TextButton(
           onPressed: () {
-            context.read<AuthScreenBloc>().add(SwitchToSignup());
+            context.read<AuthSwitchCubit>().switchSignupScreen();
+            // Navigator.pushNamedAndRemoveUntil(
+            //   context,
+            //   RoutesNames.signupScreen,
+            //   (route) => false,
+            // );
           },
           child: const Text('Sign Up'),
         ),

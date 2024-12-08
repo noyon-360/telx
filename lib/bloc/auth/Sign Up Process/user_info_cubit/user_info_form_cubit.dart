@@ -1,10 +1,9 @@
-import 'dart:convert';
-
 import 'package:bloc/bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:meta/meta.dart';
 import 'package:telx/config/routes/routes_names.dart';
 import 'package:telx/repositories/authentication_repository.dart';
 import 'package:telx/src/models/user.dart';
@@ -14,7 +13,7 @@ part 'user_info_form_state.dart';
 class UserInfoFormCubit extends Cubit<UserInfoFormState> {
   UserInfoFormCubit(this._authenticationRepository)
       : super(UserInfoFormState.initial());
-  AuthenticationRepository _authenticationRepository;
+  final AuthenticationRepository _authenticationRepository;
 
   // Update full name
   void updateFullName(String fullName) {
@@ -29,7 +28,7 @@ class UserInfoFormCubit extends Cubit<UserInfoFormState> {
       return;
     }
 
-    if (username.length < 8) {
+    else if (username.length < 8) {
       emit(state.copyWith(usernameMessage: "Need 8 character"));
       if (!username.contains("_")) {
         emit(state.copyWith(usernameMessage: "Need (_)"));
@@ -37,41 +36,50 @@ class UserInfoFormCubit extends Cubit<UserInfoFormState> {
       }
       return;
     }
+    //
+    // else if (username.contains(" ")) {
+    //   emit(state.copyWith(usernameMessage: "Need (_)"));
+    //   return;
+    // }
+    else if(username.isNotEmpty && username.length > 8 && username.contains('_')) {
+      emit(state.copyWith(usernameMessage: null));
+      // Check if the username is unique in Firestore
+      _checkUsernameUnique(username);
 
-    if (username.contains(" ")) {
-      emit(state.copyWith(usernameMessage: "Need (_)"));
-      return;
+      // Emit the new state with the suggested username
+      emit(state.copyWith(
+        username: username,
+        usernameMessage: state.isUnique
+            ? "Username is available!"
+            : "Username is already taken.",
+      ));
     }
 
-    emit(state.copyWith(usernameMessage: null));
-    // Check if the username is unique in Firestore
-    _checkUsernameUnique(username);
-    emit(state.copyWith(nameLoading: true));
-
-    // Emit the new state with the suggested username
-    emit(state.copyWith(
-      username: username,
-      usernameMessage: state.isUnique
-          ? "Username is available!"
-          : "Username is already taken.",
-    ));
   }
 
   Future<void> _checkUsernameUnique(String username) async {
     try {
+      emit(state.copyWith(nameLoading: true));
       final querySnapshot = await FirebaseFirestore.instance
           .collection('users')
           .where('username', isEqualTo: username)
           .get();
 
+
+      print(querySnapshot.docs);
+
       bool isUnique = querySnapshot.docs.isEmpty; // True if available
+
+      // if(isUnique) emit(state.copyWith(nameLoading: false));
 
       // Emit the updated state with the result (no error)
       emit(state.copyWith(
         isUnique: isUnique,
+        nameLoading: false,
         usernameMessage:
             isUnique ? "Username is available!" : "Username is already taken.",
       ));
+
     } catch (e) {
       // Handle Firestore errors or network issues
       emit(state.copyWith(
@@ -79,6 +87,7 @@ class UserInfoFormCubit extends Cubit<UserInfoFormState> {
         usernameMessage: "Error checking username. Please try again.",
       ));
       print("Error checking username: $e"); // Log error for debugging
+      emit(state.copyWith(nameLoading: false));
     }
   }
 
@@ -92,7 +101,7 @@ class UserInfoFormCubit extends Cubit<UserInfoFormState> {
     emit(state.copyWith(selectedGender: gender));
   }
 
-  Future<void> submitForm(BuildContext context, String email) async {
+  Future<void> submitForm(BuildContext context) async {
     // Validate that all required fields are filled
     if (state.fullName.isEmpty ||
         state.username.isEmpty ||
@@ -102,6 +111,13 @@ class UserInfoFormCubit extends Cubit<UserInfoFormState> {
       print("All the values are empty");
       return;
     }
+    // final _authenticationRepository = AuthenticationRepository();
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final userId = currentUser?.uid ?? "";
+    final email = currentUser?.email ?? "";
+    // final userId = _authenticationRepository.currentUser.id;
+    // final email = _authenticationRepository.currentUser.email;
 
     try {
       // Show loading state while the request is being processed
@@ -113,7 +129,8 @@ class UserInfoFormCubit extends Cubit<UserInfoFormState> {
       print(state.selectedGender);
       print(email);
 
-      final user = User(
+      final user = UserModel(
+        id: userId,
         fullName: state.fullName,
         username: state.username,
         email: email,

@@ -1,14 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:telx/bloc/Sign%20Up%20Process/SignupCubit/signup_cubit.dart';
-import 'package:telx/bloc/Sign%20Up%20Process/user_info_cubit/user_info_form_cubit.dart';
-import 'package:telx/bloc/auth/LoginCubit/login_cubit.dart';
-import 'package:telx/data/theme/color.dart';
-import 'package:telx/presentation/widgets/custom_input_field_decorator.dart';
-import 'package:telx/presentation/widgets/custom_loading.dart';
-import 'package:telx/presentation/widgets/snack_bar_helper.dart';
-import 'package:telx/utils/device_utils.dart';
+// import 'package:flutter/material.dart';
+// import 'package:flutter_bloc/flutter_bloc.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
+// import 'package:telx/bloc/Sign%20Up%20Process/SignupCubit/signup_cubit.dart';
+// import 'package:telx/bloc/Sign%20Up%20Process/user_info_cubit/user_info_form_cubit.dart';
+// import 'package:telx/bloc/auth/LoginCubit/login_cubit.dart';
+// import 'package:telx/data/theme/color.dart';
+// import 'package:telx/presentation/widgets/custom_input_field_decorator.dart';
+// import 'package:telx/presentation/widgets/custom_loading.dart';
+// import 'package:telx/presentation/widgets/snack_bar_helper.dart';
+// import 'package:telx/utils/device_utils.dart';
+
+part of 'signup_view_link.dart';
 
 class UserInfoFormScreen extends StatelessWidget {
   const UserInfoFormScreen({super.key});
@@ -118,29 +120,32 @@ class UsernameWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<UserInfoFormCubit, UserInfoFormState>(
-      builder: (context, state) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextFormField(
-              decoration: customInputDecoration(
-                  labelText: "Username",
-                  hintText: 'Chose a username',
-                  context: context),
-              onChanged: (userName) {
-                context.read<UserInfoFormCubit>().updateUsername(userName);
-              },
-            ),
-            SizedBox(
-              height: 25,
-              child: state.usernameMessage.isNotEmpty
-                  ? Text(state.usernameMessage)
-                  : const ThreeDotLoading(),
-            )
-          ],
-        );
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          decoration: customInputDecoration(
+              labelText: "Username",
+              hintText: 'Chose a username',
+              context: context),
+          onChanged: (userName) {
+            context.read<UserInfoFormCubit>().updateUsername(userName);
+          },
+        ),
+        BlocBuilder<UserInfoFormCubit, UserInfoFormState>(
+          buildWhen: (previous, current) =>
+              previous.username != current.username,
+          builder: (context, state) {
+            return state.username.isNotEmpty
+                ? SizedBox(
+                    height: 25,
+                    child: state.username.isNotEmpty
+                        ? Text(state.usernameMessage)
+                        : const SizedBox.shrink())
+                : const SizedBox.shrink();
+          },
+        )
+      ],
     );
   }
 }
@@ -278,9 +283,8 @@ class SubmitButton extends StatelessWidget {
         height: 50,
         child: ElevatedButton(
           onPressed: () async {
-            final prefs = await SharedPreferences.getInstance();
-            String? email = prefs.getString("userEmail");
-            context.read<UserInfoFormCubit>().submitForm(context, email.toString());
+            if (!context.mounted) return;
+            context.read<UserInfoFormCubit>().submitForm(context);
           },
           child: const Text(
             'Submit',
